@@ -77,7 +77,7 @@ describe('tubes', () => {
       ])
     })
 
-    test('convert the input artifact is not array for a sub-phase', async () => {
+    test('convert the input as an array for a sub-phase', async () => {
       type Phase = 'just' | 'do'
       const plugins: Plugin<Phase>[] = [
         {
