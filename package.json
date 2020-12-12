@@ -1,5 +1,5 @@
 {
-  "name": "tubes",
+  "name": "@ngryman/tubes",
   "version": "0.0.0",
   "description": "Tasks executor with a plugin system.",
   "main": "dist/tubes.js",
@@ -16,8 +16,6 @@
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^17.0.0",
-    "@rollup/plugin-node-resolve": "^11.0.0",
     "@rollup/plugin-typescript": "^8.0.0",
     "@types/jest": "^26.0.17",
     "@types/lodash": "^4.14.165",
