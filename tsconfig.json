@@ -3,6 +3,7 @@
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": "packages",
+    "declaration": true,
     "esModuleInterop": true,
     "lib": ["esnext"],
     "module": "esnext",
@@ -14,5 +15,5 @@
     "target": "esnext"
   },
   "include": ["src"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "src/*.spec.ts", "node_modules"]
 }

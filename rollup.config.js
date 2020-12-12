@@ -1,4 +1,11 @@
-import typescript from '@rollup/plugin-typescript'
+/**
+ * Note: Not using `@rollup/plugin-typescript` as it doesn't support emitting
+ * declaration files yet.
+ *
+ * Watch for: https://github.com/rollup/plugins/issues/394
+ */
+
+import typescript from 'rollup-plugin-typescript2'
 import pkg from './package.json'
 
 export default {
