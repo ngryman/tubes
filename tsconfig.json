@@ -5,7 +5,7 @@
     "baseUrl": "packages",
     "esModuleInterop": true,
     "lib": ["esnext"],
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
     "resolveJsonModule": true,

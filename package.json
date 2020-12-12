@@ -2,11 +2,12 @@
   "name": "tubes",
   "version": "0.0.0",
   "description": "Tasks executor with a plugin system.",
-  "main": "src/tubes.ts",
+  "main": "dist/tubes.js",
   "module": "dist/tubes.es.js",
   "types": "dist/tubes.d.ts",
   "scripts": {
     "build": "rollup -c",
+    "dev": "rollup -c -w",
     "format": "prettier --check .",
     "lint": "eslint src/**/*.ts",
     "test": "jest"
@@ -15,6 +16,7 @@
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
     "@rollup/plugin-typescript": "^8.0.0",
     "@types/jest": "^26.0.17",
