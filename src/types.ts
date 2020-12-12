@@ -1,13 +1,14 @@
 export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 
-export type Hook<Phase extends string, T = unknown> = (
-  input: T,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Hook<Phase extends string, Input = any, Output = any> = (
+  input: Input,
   context: Context<Phase>
-) => AsyncOrSync<T>
+) => AsyncOrSync<Output | undefined>
 
 export type Task<T = unknown> = (input: T) => Promise<T>
 
-export type HookNames<T extends string> =
+export type HookName<T extends string> =
   | `${T}Start`
   | `${T}Before`
   | T
@@ -15,7 +16,7 @@ export type HookNames<T extends string> =
   | `${T}End`
 
 export type Plugin<Phase extends string> = {
-  [key in HookNames<Phase>]?: Hook<Phase>
+  [key in HookName<Phase>]?: Hook<Phase>
 }
 
 export type PhaseOption<Phase extends string> = Phase | Phase[]
@@ -30,12 +31,8 @@ export type Context<Phase extends string> = {
   plugins: Plugin<Phase>[]
 }
 
-export type Unit = {
-  input: unknown
-  output: unknown
-}
-
-export type Result = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Result<Output = any> = {
   errors: Error[]
-  output: unknown
+  output: Output
 }

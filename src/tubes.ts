@@ -1,4 +1,4 @@
-import { Context, HookNames, Options, PhaseOption, Result, Task } from './types'
+import { Context, HookName, Options, PhaseOption, Result, Task } from './types'
 
 async function pipe<T>(tasks: Task<T>[], value: T): Promise<T> {
   return await tasks.reduce(async (prevPromise, fn) => {
@@ -9,7 +9,7 @@ async function pipe<T>(tasks: Task<T>[], value: T): Promise<T> {
 
 async function invokeHook<Phase extends string>(
   context: Context<Phase>,
-  hookName: HookNames<Phase>,
+  hookName: HookName<Phase>,
   input: unknown,
   mutable = false,
   stopOnFirst = false
@@ -31,13 +31,12 @@ async function executePhase<Phase extends string>(
   input: unknown
 ): Promise<unknown> {
   const tasks: Task[] = [
-    input => invokeHook(context, <HookNames<Phase>>`${phase}Start`, input),
+    input => invokeHook(context, <HookName<Phase>>`${phase}Start`, input),
     input =>
-      invokeHook(context, <HookNames<Phase>>`${phase}Before`, input, true),
+      invokeHook(context, <HookName<Phase>>`${phase}Before`, input, true),
     input => invokeHook(context, phase, input, true, true),
-    input =>
-      invokeHook(context, <HookNames<Phase>>`${phase}After`, input, true),
-    input => invokeHook(context, <HookNames<Phase>>`${phase}End`, input)
+    input => invokeHook(context, <HookName<Phase>>`${phase}After`, input, true),
+    input => invokeHook(context, <HookName<Phase>>`${phase}End`, input)
   ]
 
   return await pipe(tasks, input)
@@ -63,15 +62,16 @@ async function executePipeline<Phase extends string>(
   return await pipe(tasks, input)
 }
 
-export async function tubes<Phase extends string>(
-  input: unknown,
-  options: Options<Phase>
-): Promise<Result> {
+export async function tubes<
+  Phase extends string,
+  Output = unknown,
+  Input = unknown
+>(input: Input, options: Options<Phase>): Promise<Result<Output>> {
   const context: Context<Phase> = {
     errors: [],
     plugins: options.plugins
   }
 
-  const output = await executePipeline(context, options.phases, input)
+  const output = <Output>await executePipeline(context, options.phases, input)
   return { errors: context.errors, output }
 }

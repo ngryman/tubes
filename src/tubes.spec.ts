@@ -1,3 +1,4 @@
+import 'jest-extended'
 import { mocked } from 'ts-jest/utils'
 import { Plugin } from './types'
 import { tubes } from './tubes'
@@ -42,10 +43,10 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      const hookNames = <(keyof typeof plugin)[]>Object.keys(plugin)
-      for (let i = 1; i < hookNames.length; i++) {
-        expect(plugin[hookNames[i - 1]]).toHaveBeenCalledBefore(
-          mocked(plugin[hookNames[i]]!)
+      const HookName = <(keyof typeof plugin)[]>Object.keys(plugin)
+      for (let i = 1; i < HookName.length; i++) {
+        expect(plugin[HookName[i - 1]]).toHaveBeenCalledBefore(
+          mocked(plugin[HookName[i]]!)
         )
       }
     })
@@ -343,6 +344,15 @@ describe('tubes', () => {
       })
 
       expect(result.output).toBe('baz')
+    })
+
+    test('passthrough the input if no producer hook is defined', async () => {
+      const result = await tubes('foo', {
+        phases: ['do'],
+        plugins: []
+      })
+
+      expect(result.output).toBe('foo')
     })
   })
 })
