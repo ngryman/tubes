@@ -1,12 +1,4 @@
-import {
-  Context,
-  HookName,
-  Options,
-  PhaseOption,
-  PlainObject,
-  Result,
-  Task
-} from './types'
+import { Context, HookName, Options, PhaseOption, Result, Task } from './types'
 
 async function pipe<Input, Output>(
   tasks: Task<Input, Output>[],
@@ -18,12 +10,7 @@ async function pipe<Input, Output>(
   }, Promise.resolve(<Output>(<unknown>value)))
 }
 
-async function invokeHook<
-  Phase extends string,
-  Output,
-  Input,
-  State extends PlainObject
->(
+async function invokeHook<Phase extends string, State, Output, Input>(
   context: Context<Phase>,
   hookName: HookName<Phase>,
   input: Input,
@@ -42,12 +29,7 @@ async function invokeHook<
   return <Output>(<unknown>output)
 }
 
-async function executePhase<
-  Phase extends string,
-  Output,
-  Input,
-  State extends PlainObject
->(
+async function executePhase<Phase extends string, State, Output, Input>(
   context: Context<Phase>,
   phase: Phase,
   input: Input,
@@ -73,12 +55,7 @@ async function executePhase<
   return await pipe<Input, Output>(tasks, input)
 }
 
-async function executePipeline<
-  Phase extends string,
-  State extends PlainObject,
-  Input,
-  Output
->(
+async function executePipeline<Phase extends string, State, Input, Output>(
   context: Context<Phase>,
   phases: PhaseOption<Phase>[],
   input: Input,
@@ -90,7 +67,8 @@ async function executePipeline<
         const inputArr = <Input[]>(Array.isArray(input) ? input : [input])
         const outputArr = await Promise.all(
           inputArr.map<Promise<Output>>(
-            async input => await executePipeline(context, phase, input, state)
+            async input =>
+              await executePipeline(context, phase, input, { ...state })
           )
         )
         return <Output>(<unknown>outputArr)
@@ -105,7 +83,7 @@ async function executePipeline<
 
 export async function tubes<
   Phase extends string,
-  State extends PlainObject = PlainObject,
+  State = any,
   Input = any,
   Output = any
 >(

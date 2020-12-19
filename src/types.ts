@@ -1,10 +1,8 @@
 export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 
-export type PlainObject = Record<string, unknown>
-
 export type Hook<
   Phase extends string,
-  State extends PlainObject = PlainObject,
+  State = any,
   Input = any,
   Output = any
 > = (
