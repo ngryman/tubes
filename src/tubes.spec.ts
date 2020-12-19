@@ -72,9 +72,9 @@ describe('tubes', () => {
       })
 
       expect(mocked(plugins[1].do!).mock.calls).toEqual([
-        [0, expectedContext],
-        [1, expectedContext],
-        [2, expectedContext]
+        [0, {}, expectedContext],
+        [1, {}, expectedContext],
+        [2, {}, expectedContext]
       ])
     })
 
@@ -98,7 +98,7 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(plugins[1].do).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugins[1].do).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
   })
 
@@ -117,7 +117,7 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.doStart).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugin.doStart).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
 
     test('pass the input and context to the before hook', async () => {
@@ -134,7 +134,7 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.doBefore).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugin.doBefore).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
 
     test('pass the input and context to the producer hook', async () => {
@@ -151,7 +151,7 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.do).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugin.do).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
 
     test('pass the output and context to the after hook', async () => {
@@ -169,7 +169,7 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.doAfter).toHaveBeenCalledWith('bar', expectedContext)
+      expect(plugin.doAfter).toHaveBeenCalledWith('bar', {}, expectedContext)
     })
 
     test('pass the output and context to the end hook', async () => {
@@ -187,7 +187,7 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.doEnd).toHaveBeenCalledWith('bar', expectedContext)
+      expect(plugin.doEnd).toHaveBeenCalledWith('bar', {}, expectedContext)
     })
   })
 
@@ -212,7 +212,11 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(plugins[1].doStart).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugins[1].doStart).toHaveBeenCalledWith(
+        'foo',
+        {},
+        expectedContext
+      )
     })
 
     test('pass the result of the previous before hook to the next before hook', async () => {
@@ -235,7 +239,11 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(plugins[1].doBefore).toHaveBeenCalledWith('bar', expectedContext)
+      expect(plugins[1].doBefore).toHaveBeenCalledWith(
+        'bar',
+        {},
+        expectedContext
+      )
     })
 
     test('stop on the first return of a producer hook', async () => {
@@ -277,7 +285,11 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(plugins[1].doAfter).toHaveBeenCalledWith('bar', expectedContext)
+      expect(plugins[1].doAfter).toHaveBeenCalledWith(
+        'bar',
+        {},
+        expectedContext
+      )
     })
 
     test('ignore the result of an end hook', async () => {
@@ -300,7 +312,11 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(plugins[1].doStart).toHaveBeenCalledWith('foo', expectedContext)
+      expect(plugins[1].doStart).toHaveBeenCalledWith(
+        'foo',
+        {},
+        expectedContext
+      )
     })
   })
 
