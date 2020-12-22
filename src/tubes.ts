@@ -1,5 +1,5 @@
 import { TubesError } from './error'
-import { Context, Options, PhaseOption, Result, Step, Task } from './types'
+import { Context, Options, StageOption, Result, Step, Task } from './types'
 
 async function pipe<Input, Output>(
   tasks: Task<Input, Output>[],
@@ -11,9 +11,9 @@ async function pipe<Input, Output>(
   }, Promise.resolve(<Output>(<unknown>value)))
 }
 
-async function invokeHook<Phase extends string, State, Output, Input>(
-  context: Context<Phase>,
-  step: Step<Phase>,
+async function invokeHook<Stage extends string, State, Output, Input>(
+  context: Context<Stage>,
+  step: Step<Stage>,
   input: Input,
   state: State,
   stopOnFirst = false
@@ -39,47 +39,49 @@ async function invokeHook<Phase extends string, State, Output, Input>(
   return <Output>(<unknown>output)
 }
 
-async function executePhase<Phase extends string, State, Output, Input>(
-  context: Context<Phase>,
-  phase: Phase,
+async function executeStage<Stage extends string, State, Output, Input>(
+  context: Context<Stage>,
+  stage: Stage,
   input: Input,
   state: State
 ): Promise<Output> {
-  const phaseContext = {
+  const stageContext = {
     ...context,
-    phase
+    stage
   }
 
   const tasks: Task<Input, Output>[] = [
     input =>
-      invokeHook(phaseContext, <Step<Phase>>`${phase}Before`, input, state),
-    input => invokeHook(phaseContext, phase, input, state, true),
+      invokeHook(stageContext, <Step<Stage>>`${stage}Before`, input, state),
+    input => invokeHook(stageContext, stage, input, state, true),
     input =>
-      invokeHook(phaseContext, <Step<Phase>>`${phase}After`, input, state)
+      invokeHook(stageContext, <Step<Stage>>`${stage}After`, input, state)
   ]
 
   return await pipe<Input, Output>(tasks, input)
 }
 
-async function executePipeline<Phase extends string, State, Input, Output>(
-  context: Context<Phase>,
-  phases: PhaseOption<Phase>[],
+async function executePipeline<Stage extends string, State, Input, Output>(
+  context: Context<Stage>,
+  stages: StageOption<Stage>[],
   input: Input,
   state: State
 ): Promise<Output> {
-  const tasks: Task<Input, Output>[] = phases.map(phase => {
+  const tasks: Task<Input, Output>[] = stages.map(stage => {
     const task: Task<Input, Output> = async input => {
-      if (Array.isArray(phase)) {
+      if (Array.isArray(stage)) {
         const inputArr = <Input[]>(Array.isArray(input) ? input : [input])
         const outputArr = await Promise.all(
           inputArr.map<Promise<Output>>(
             async input =>
-              await executePipeline(context, phase, input, { ...state })
+              await executePipeline(context, stage, input, {
+                ...state
+              })
           )
         )
         return <Output>(<unknown>outputArr)
       }
-      return await executePhase(context, phase, input, state)
+      return await executeStage(context, stage, input, state)
     }
     return task
   })
@@ -88,23 +90,25 @@ async function executePipeline<Phase extends string, State, Input, Output>(
 }
 
 export async function tubes<
-  Phase extends string,
+  Stage extends string,
   State = any,
   Input = any,
   Output = any
 >(
   input: Input,
-  options: Options<Phase>,
+  options: Options<Stage>,
   initialState: State = <State>{}
 ): Promise<Result<Output>> {
-  const context: Context<Phase> = {
+  const context: Context<Stage> = {
     errors: [],
+    stage: '',
+    step: '',
     plugins: options.plugins
   }
 
-  const output = await executePipeline<Phase, State, Input, Output>(
+  const output = await executePipeline<Stage, State, Input, Output>(
     context,
-    options.phases,
+    options.stages,
     input,
     initialState
   )
