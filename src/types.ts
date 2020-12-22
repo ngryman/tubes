@@ -30,12 +30,17 @@ export type Options<Stage extends string> = {
   plugins: Plugin<Stage>[]
 }
 
+export type Cursor<Stage extends string> = {
+  stage: Stage | ''
+  step: Step<Stage> | ''
+  iteration: number
+}
+
 export type Context<Stage extends string, Input = any> = {
   errors: Error[]
   input: Input
   options: Options<Stage>
-  stage: Stage | ''
-  step: Step<Stage> | ''
+  cursor: Cursor<Stage>
 }
 
 export type Result<Output = any> = {

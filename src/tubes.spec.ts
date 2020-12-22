@@ -1,6 +1,6 @@
 import 'jest-extended'
 import { mocked } from 'ts-jest/utils'
-import { Plugin } from './types'
+import { Context, Plugin } from './types'
 import { tubes } from './tubes'
 
 describe('tubes', () => {
@@ -96,14 +96,17 @@ describe('tubes', () => {
       const plugin: Plugin<Stage> = {
         doBefore: jest.fn()
       }
-      const expectedContext = {
+      const expectedContext: Context<Stage> = {
         errors: [],
         input: 'foo',
-        stage: 'do',
-        step: 'doBefore',
         options: {
           stages: ['do'],
           plugins: [plugin]
+        },
+        cursor: {
+          stage: 'do',
+          step: 'doBefore',
+          iteration: 0
         }
       }
 
@@ -120,14 +123,17 @@ describe('tubes', () => {
       const plugin: Plugin<Stage> = {
         do: jest.fn()
       }
-      const expectedContext = {
+      const expectedContext: Context<Stage> = {
         errors: [],
         input: 'foo',
-        stage: 'do',
-        step: 'do',
         options: {
           stages: ['do'],
           plugins: [plugin]
+        },
+        cursor: {
+          stage: 'do',
+          step: 'do',
+          iteration: 0
         }
       }
 
@@ -145,14 +151,17 @@ describe('tubes', () => {
         do: () => 'bar',
         doAfter: jest.fn()
       }
-      const expectedContext = {
+      const expectedContext: Context<Stage> = {
         errors: [],
         input: 'foo',
-        stage: 'do',
-        step: 'doAfter',
         options: {
           stages: ['do'],
           plugins: [plugin]
+        },
+        cursor: {
+          stage: 'do',
+          step: 'doAfter',
+          iteration: 0
         }
       }
 
@@ -326,8 +335,11 @@ describe('tubes', () => {
       })
 
       expect(errors[0]).toMatchObject({
-        stage: 'do',
-        step: 'do'
+        cursor: {
+          stage: 'do',
+          step: 'do',
+          iteration: 0
+        }
       })
     })
   })
