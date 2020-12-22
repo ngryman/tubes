@@ -1,59 +1,52 @@
 import { TubesError } from './error'
 import {
   Context,
+  Cursor,
+  Immutable,
   Options,
-  StageOption,
+  PlainObject,
   Result,
   Step,
-  Task,
-  PlainObject
+  Task
 } from './types'
 
-function deepFreeze<T extends PlainObject>(object: T): T {
+function maybeFreeze<T extends PlainObject>(
+  object: T,
+  freeze: boolean
+): Immutable<T> {
+  return <Immutable<T>>(freeze ? Object.freeze(object) : object)
+}
+
+function maybeDeepFreeze<T extends PlainObject>(
+  object: T,
+  freeze: boolean
+): Immutable<T> {
+  if (!freeze) {
+    return <Immutable<T>>object
+  }
+
   const propNames = Object.getOwnPropertyNames(object)
   for (const name of propNames) {
     const value = object[name]
     if (value && typeof object[name] === 'object') {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      deepFreeze(<PlainObject>value)
+      maybeDeepFreeze(<PlainObject>value, true)
     }
   }
-  return Object.freeze(object)
+  return maybeFreeze(object, true)
 }
 
-function createContext<Stage extends string, Input>(
-  input: Input,
-  options: Options<Stage>
-): Context<Stage, Input> {
-  const context = {
-    errors: [],
-    input: options.freeze ? deepFreeze(input) : input,
-    options: options.freeze ? deepFreeze(options) : options,
-    cursor: {
-      stage: '',
-      step: '',
-      iteration: -1
-    }
-  }
-
-  return <Context<Stage, Input>>(options.freeze ? deepFreeze(context) : context)
-}
-
-function updateContext<Phase extends string>(
+function freezeContext<Phase extends string>(
   prevContext: Context<Phase>,
   newContext: Partial<Context<Phase>>
-): Context<Phase> {
-  return Object.freeze({
-    ...prevContext,
-    ...(prevContext.options.freeze ? deepFreeze(newContext) : newContext)
-  })
-}
-
-function prepareState<Stage extends string, State>(
-  state: State,
-  options: Options<Stage>
-) {
-  return options.freeze ? deepFreeze(state) : state
+): Immutable<Context<Phase>> {
+  return <Immutable<Context<Phase>>>maybeFreeze(
+    {
+      ...prevContext,
+      ...maybeDeepFreeze(newContext, prevContext.options.freeze)
+    },
+    prevContext.options.freeze
+  )
 }
 
 async function pipe<Input, Output>(
@@ -82,23 +75,24 @@ async function invokeHook<
 ): Promise<Output> {
   const { options } = context
 
-  const hookState = options.freeze ? deepFreeze(state) : state
+  const hookState = maybeDeepFreeze(state, options.freeze)
 
-  const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
   let output = input
+  const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
+
   for (let i = 0; i < hooks.length; i++) {
     const hook = hooks[i]
 
-    const hookContext = updateContext(context, {
-      cursor: { stage, step, iteration: i }
-    })
+    const cursor: Cursor<Stage> = { stage, step, iteration: i }
+
+    const hookContext = freezeContext(context, { cursor })
 
     try {
       const hookOutput = await hook!(output, hookState, hookContext)
       output = hookOutput || output
     } catch (err) {
       if (err.name === 'TypeError') throw err
-      context.errors.push(new TubesError(err, hookContext))
+      context.errors.push(new TubesError(err, hookContext.cursor))
     }
 
     if (stopOnFirst && output) return <Output>(<unknown>output)
@@ -138,7 +132,7 @@ async function executePipeline<
   Output
 >(
   context: Context<Stage, InitialInput>,
-  stages: StageOption<Stage>[],
+  stages: (Stage | Stage[])[],
   input: Input,
   state: State
 ): Promise<Output> {
@@ -172,14 +166,27 @@ export async function tubes<
   options: Options<Stage>,
   initialState: State = <State>{}
 ): Promise<Result<Output>> {
-  const context = createContext(input, options)
-  const state = prepareState(initialState, options)
+  const validOptions = {
+    freeze: false,
+    ...options
+  }
+
+  const context: Context<Stage, Input> = {
+    errors: [],
+    input: maybeDeepFreeze(input, validOptions.freeze),
+    options: maybeDeepFreeze(validOptions, validOptions.freeze),
+    cursor: {
+      stage: '',
+      step: '',
+      iteration: -1
+    }
+  }
 
   const output = await executePipeline<Stage, State, Input, Input, Output>(
     context,
-    options.stages,
+    validOptions.stages,
     input,
-    state
+    initialState
   )
 
   return { errors: context.errors, output }

@@ -101,7 +101,8 @@ describe('tubes', () => {
         input: 'foo',
         options: {
           stages: ['do'],
-          plugins: [plugin]
+          plugins: [plugin],
+          freeze: false
         },
         cursor: {
           stage: 'do',
@@ -128,7 +129,8 @@ describe('tubes', () => {
         input: 'foo',
         options: {
           stages: ['do'],
-          plugins: [plugin]
+          plugins: [plugin],
+          freeze: false
         },
         cursor: {
           stage: 'do',
@@ -156,7 +158,8 @@ describe('tubes', () => {
         input: 'foo',
         options: {
           stages: ['do'],
-          plugins: [plugin]
+          plugins: [plugin],
+          freeze: false
         },
         cursor: {
           stage: 'do',
@@ -177,6 +180,8 @@ describe('tubes', () => {
       type Stage = 'do'
       const plugin: Plugin<Stage> = {
         do: (input, state) => {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
           state.foo = 'foo'
         }
       }
@@ -200,6 +205,8 @@ describe('tubes', () => {
       type Stage = 'do'
       const plugin: Plugin<Stage> = {
         do: (input, state, context) => {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
           context.input = 'foo'
         }
       }
