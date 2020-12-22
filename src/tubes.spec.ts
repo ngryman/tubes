@@ -90,9 +90,10 @@ describe('tubes', () => {
     })
   })
 
-  describe('hook signatures', () => {
+  describe('hook API', () => {
     test('pass the artifact, state, and context to the before hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         doBefore: jest.fn()
       }
       const expectedContext = {
@@ -100,7 +101,10 @@ describe('tubes', () => {
         input: 'foo',
         stage: 'do',
         step: 'doBefore',
-        plugins: [plugin]
+        options: {
+          stages: ['do'],
+          plugins: [plugin]
+        }
       }
 
       await tubes('foo', {
@@ -112,7 +116,8 @@ describe('tubes', () => {
     })
 
     test('pass the artifact, state, and context to the phase hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         do: jest.fn()
       }
       const expectedContext = {
@@ -120,7 +125,10 @@ describe('tubes', () => {
         input: 'foo',
         stage: 'do',
         step: 'do',
-        plugins: [plugin]
+        options: {
+          stages: ['do'],
+          plugins: [plugin]
+        }
       }
 
       await tubes('foo', {
@@ -132,7 +140,8 @@ describe('tubes', () => {
     })
 
     test('pass the output, state, and context to the after hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         do: () => 'bar',
         doAfter: jest.fn()
       }
@@ -141,7 +150,10 @@ describe('tubes', () => {
         input: 'foo',
         stage: 'do',
         step: 'doAfter',
-        plugins: [plugin]
+        options: {
+          stages: ['do'],
+          plugins: [plugin]
+        }
       }
 
       await tubes('foo', {
@@ -150,6 +162,52 @@ describe('tubes', () => {
       })
 
       expect(plugin.doAfter).toHaveBeenCalledWith('bar', {}, expectedContext)
+    })
+
+    test('freeze the state if specified', async () => {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
+        do: (input, state) => {
+          state.foo = 'foo'
+        }
+      }
+
+      await expect(
+        tubes(
+          'foo',
+          {
+            stages: ['do'],
+            plugins: [plugin],
+            freeze: true
+          },
+          { foo: 'foo' }
+        )
+      ).rejects.toThrowErrorMatchingInlineSnapshot(
+        `"Cannot assign to read only property 'foo' of object '#<Object>'"`
+      )
+    })
+
+    test('freeze the context if specified', async () => {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
+        do: (input, state, context) => {
+          context.input = 'foo'
+        }
+      }
+
+      await expect(
+        tubes(
+          'foo',
+          {
+            stages: ['do'],
+            plugins: [plugin],
+            freeze: true
+          },
+          { foo: 'foo' }
+        )
+      ).rejects.toThrowErrorMatchingInlineSnapshot(
+        `"Cannot assign to read only property 'input' of object '#<Object>'"`
+      )
     })
   })
 
@@ -192,7 +250,7 @@ describe('tubes', () => {
       expect(mocked(plugins[1].doBefore!).mock.calls[0][0]).toBe('foo')
     })
 
-    test('stop on the first return of a producer hook', async () => {
+    test('stop on the first return of a phase hook', async () => {
       type Stage = 'do'
       const plugins: Plugin<Stage>[] = [
         {
@@ -289,7 +347,7 @@ describe('tubes', () => {
       expect(plugin.do.mock.calls[0][0]).toBe('bar')
     })
 
-    test('transform the input with the producer hook', async () => {
+    test('transform the input with the phase hook', async () => {
       const plugin = {
         do: () => 'bar'
       }
@@ -316,7 +374,7 @@ describe('tubes', () => {
       expect(result.output).toBe('baz')
     })
 
-    test('passthrough the input if no producer hook is defined', async () => {
+    test('passthrough the input if no phase hook is defined', async () => {
       const result = await tubes('foo', {
         stages: ['do'],
         plugins: []

@@ -1,5 +1,25 @@
 import { TubesError } from './error'
-import { Context, Options, StageOption, Result, Step, Task } from './types'
+import {
+  Context,
+  Options,
+  StageOption,
+  Result,
+  Step,
+  Task,
+  PlainObject
+} from './types'
+
+function deepFreeze<T extends PlainObject>(object: T): T {
+  const propNames = Object.getOwnPropertyNames(object)
+  for (const name of propNames) {
+    const value = object[name]
+    if (value && typeof object[name] === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      deepFreeze(<PlainObject>value)
+    }
+  }
+  return Object.freeze(object)
+}
 
 async function pipe<Input, Output>(
   tasks: Task<Input, Output>[],
@@ -19,25 +39,34 @@ async function invokeHook<
   Input
 >(
   context: Context<Stage, InitialInput>,
+  stage: Stage,
   step: Step<Stage>,
   input: Input,
   state: State,
   stopOnFirst = false
 ): Promise<Output> {
-  const hookContext = {
+  const { options } = context
+
+  const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
+
+  const newContext = {
     ...context,
+    stage,
     step
   }
 
-  const hooks = context.plugins.map(plugin => plugin[step]).filter(Boolean)
+  const frozenContext = options.freeze ? Object.freeze(newContext) : newContext
+
+  const frozenState = options.freeze ? deepFreeze(state) : state
 
   let output = input
   for (const hook of hooks) {
     try {
-      const hookOutput = await hook!(output, state, hookContext)
+      const hookOutput = await hook!(output, frozenState, frozenContext)
       output = hookOutput || output
     } catch (err) {
-      context.errors.push(new TubesError(err, hookContext))
+      if (err.name === 'TypeError') throw err
+      context.errors.push(new TubesError(err, frozenContext))
     }
     if (stopOnFirst && output) return <Output>(<unknown>output)
   }
@@ -57,17 +86,12 @@ async function executeStage<
   input: Input,
   state: State
 ): Promise<Output> {
-  const stageContext = {
-    ...context,
-    stage
-  }
-
   const tasks: Task<Input, Output>[] = [
     input =>
-      invokeHook(stageContext, <Step<Stage>>`${stage}Before`, input, state),
-    input => invokeHook(stageContext, stage, input, state, true),
+      invokeHook(context, stage, <Step<Stage>>`${stage}Before`, input, state),
+    input => invokeHook(context, stage, stage, input, state, true),
     input =>
-      invokeHook(stageContext, <Step<Stage>>`${stage}After`, input, state)
+      invokeHook(context, stage, <Step<Stage>>`${stage}After`, input, state)
   ]
 
   return await pipe<Input, Output>(tasks, input)
@@ -92,9 +116,7 @@ async function executePipeline<
         const outputArr = await Promise.all(
           inputArr.map<Promise<Output>>(
             async input =>
-              await executePipeline(context, stage, input, {
-                ...state
-              })
+              await executePipeline({ ...context }, stage, input, { ...state })
           )
         )
         return <Output>(<unknown>outputArr)
@@ -109,7 +131,7 @@ async function executePipeline<
 
 export async function tubes<
   Stage extends string,
-  State = any,
+  State extends PlainObject = PlainObject,
   Input = any,
   Output = any
 >(
@@ -119,17 +141,19 @@ export async function tubes<
 ): Promise<Result<Output>> {
   const context: Context<Stage, Input> = {
     errors: [],
-    input,
+    input: options.freeze ? deepFreeze(input) : input,
     stage: '',
     step: '',
-    plugins: options.plugins
+    options: options.freeze ? deepFreeze(options) : options
   }
+
+  const state = options.freeze ? deepFreeze(initialState) : initialState
 
   const output = await executePipeline<Stage, State, Input, Input, Output>(
     context,
     options.stages,
     input,
-    initialState
+    state
   )
 
   return { errors: context.errors, output }
