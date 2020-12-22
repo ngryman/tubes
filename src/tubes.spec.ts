@@ -4,10 +4,10 @@ import { Plugin } from './types'
 import { tubes } from './tubes'
 
 describe('tubes', () => {
-  describe('phase execution', () => {
-    test('invoke phases sequentially', async () => {
-      type Phase = 'just' | 'do' | 'it'
-      const plugins: Plugin<Phase>[] = [
+  describe('stage execution', () => {
+    test('invoke stages sequentially', async () => {
+      type Stage = 'just' | 'do' | 'it'
+      const plugins: Plugin<Stage>[] = [
         {
           just: jest.fn()
         },
@@ -19,8 +19,8 @@ describe('tubes', () => {
         }
       ]
 
-      await tubes<Phase>('foo', {
-        phases: ['just', 'do', 'it'],
+      await tubes<Stage>('foo', {
+        stages: ['just', 'do', 'it'],
         plugins
       })
 
@@ -28,32 +28,30 @@ describe('tubes', () => {
       expect(plugins[1].do).toHaveBeenCalledBefore(mocked(plugins[2].it!))
     })
 
-    test('invoke hooks within the same phase sequentially', async () => {
-      type Phase = 'do'
-      const plugin: Plugin<Phase> = {
-        doStart: jest.fn(),
+    test('invoke hooks within the same stage sequentially', async () => {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         doBefore: jest.fn(),
         do: jest.fn(),
-        doAfter: jest.fn(),
-        doEnd: jest.fn()
+        doAfter: jest.fn()
       }
 
-      await tubes<Phase>('foo', {
-        phases: ['do'],
+      await tubes<Stage>('foo', {
+        stages: ['do'],
         plugins: [plugin]
       })
 
-      const HookName = <(keyof typeof plugin)[]>Object.keys(plugin)
-      for (let i = 1; i < HookName.length; i++) {
-        expect(plugin[HookName[i - 1]]).toHaveBeenCalledBefore(
-          mocked(plugin[HookName[i]]!)
+      const steps = <(keyof typeof plugin)[]>Object.keys(plugin)
+      for (let i = 1; i < steps.length; i++) {
+        expect(plugin[steps[i - 1]]).toHaveBeenCalledBefore(
+          mocked(plugin[steps[i]]!)
         )
       }
     })
 
-    test('invoke sub-phases in parallel', async () => {
-      type Phase = 'just' | 'do'
-      const plugins: Plugin<Phase>[] = [
+    test('invoke sub-stages in parallel', async () => {
+      type Stage = 'just' | 'do'
+      const plugins: Plugin<Stage>[] = [
         {
           just: () => [0, 1, 2]
         },
@@ -61,26 +59,20 @@ describe('tubes', () => {
           do: jest.fn()
         }
       ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
 
-      await tubes<Phase>('foo', {
-        phases: ['just', ['do']],
+      await tubes<Stage>('foo', {
+        stages: ['just', ['do']],
         plugins
       })
 
-      expect(mocked(plugins[1].do!).mock.calls).toEqual([
-        [0, {}, expectedContext],
-        [1, {}, expectedContext],
-        [2, {}, expectedContext]
-      ])
+      expect(mocked(plugins[1].do!).mock.calls[0][0]).toBe(0)
+      expect(mocked(plugins[1].do!).mock.calls[1][0]).toBe(1)
+      expect(mocked(plugins[1].do!).mock.calls[2][0]).toBe(2)
     })
 
-    test('convert the input as an array for a sub-phase', async () => {
-      type Phase = 'just' | 'do'
-      const plugins: Plugin<Phase>[] = [
+    test('convert the input as an array for a sub-stage', async () => {
+      type Stage = 'just' | 'do'
+      const plugins: Plugin<Stage>[] = [
         {
           just: () => 'foo'
         },
@@ -88,49 +80,30 @@ describe('tubes', () => {
           do: jest.fn()
         }
       ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
 
-      await tubes<Phase>('foo', {
-        phases: ['just', ['do']],
+      await tubes<Stage>('foo', {
+        stages: ['just', ['do']],
         plugins
       })
 
-      expect(plugins[1].do).toHaveBeenCalledWith('foo', {}, expectedContext)
+      expect(mocked(plugins[1].do!).mock.calls[0][0]).toBe('foo')
     })
   })
 
   describe('hook signatures', () => {
-    test('pass the input and context to the start hook', async () => {
-      const plugin = {
-        doStart: jest.fn()
-      }
-      const expectedContext = {
-        errors: [],
-        plugins: [plugin]
-      }
-
-      await tubes('foo', {
-        phases: ['do'],
-        plugins: [plugin]
-      })
-
-      expect(plugin.doStart).toHaveBeenCalledWith('foo', {}, expectedContext)
-    })
-
     test('pass the input and context to the before hook', async () => {
       const plugin = {
         doBefore: jest.fn()
       }
       const expectedContext = {
         errors: [],
+        stage: 'do',
+        step: 'doBefore',
         plugins: [plugin]
       }
 
       await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
@@ -143,11 +116,13 @@ describe('tubes', () => {
       }
       const expectedContext = {
         errors: [],
+        stage: 'do',
+        step: 'do',
         plugins: [plugin]
       }
 
       await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
@@ -161,67 +136,24 @@ describe('tubes', () => {
       }
       const expectedContext = {
         errors: [],
+        stage: 'do',
+        step: 'doAfter',
         plugins: [plugin]
       }
 
       await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
       expect(plugin.doAfter).toHaveBeenCalledWith('bar', {}, expectedContext)
     })
-
-    test('pass the output and context to the end hook', async () => {
-      const plugin = {
-        do: () => 'bar',
-        doEnd: jest.fn()
-      }
-      const expectedContext = {
-        errors: [],
-        plugins: [plugin]
-      }
-
-      await tubes('foo', {
-        phases: ['do'],
-        plugins: [plugin]
-      })
-
-      expect(plugin.doEnd).toHaveBeenCalledWith('bar', {}, expectedContext)
-    })
   })
 
   describe('hook execution', () => {
-    test('ignore the result of a start hook', async () => {
-      type Phase = 'do'
-      const plugins: Plugin<Phase>[] = [
-        {
-          doStart: () => 'bar'
-        },
-        {
-          doStart: jest.fn()
-        }
-      ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
-
-      await tubes<Phase>('foo', {
-        phases: ['do'],
-        plugins
-      })
-
-      expect(plugins[1].doStart).toHaveBeenCalledWith(
-        'foo',
-        {},
-        expectedContext
-      )
-    })
-
     test('pass the result of the previous before hook to the next before hook', async () => {
-      type Phase = 'do'
-      const plugins: Plugin<Phase>[] = [
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
         {
           doBefore: () => 'bar'
         },
@@ -229,26 +161,37 @@ describe('tubes', () => {
           doBefore: jest.fn()
         }
       ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
 
-      await tubes<Phase>('foo', {
-        phases: ['do'],
+      await tubes<Stage>('foo', {
+        stages: ['do'],
         plugins
       })
 
-      expect(plugins[1].doBefore).toHaveBeenCalledWith(
-        'bar',
-        {},
-        expectedContext
-      )
+      expect(mocked(plugins[1].doBefore!).mock.calls[0][0]).toBe('bar')
+    })
+
+    test('bypass the result of a before hook if it is undefined', async () => {
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
+        {
+          doBefore: () => undefined
+        },
+        {
+          doBefore: jest.fn()
+        }
+      ]
+
+      await tubes<Stage>('foo', {
+        stages: ['do'],
+        plugins
+      })
+
+      expect(mocked(plugins[1].doBefore!).mock.calls[0][0]).toBe('foo')
     })
 
     test('stop on the first return of a producer hook', async () => {
-      type Phase = 'do'
-      const plugins: Plugin<Phase>[] = [
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
         {
           do: () => 'bar'
         },
@@ -257,8 +200,8 @@ describe('tubes', () => {
         }
       ]
 
-      await tubes<Phase>('foo', {
-        phases: ['do'],
+      await tubes<Stage>('foo', {
+        stages: ['do'],
         plugins
       })
 
@@ -266,8 +209,8 @@ describe('tubes', () => {
     })
 
     test('pass the result of the previous after hook to the next after hook', async () => {
-      type Phase = 'do'
-      const plugins: Plugin<Phase>[] = [
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
         {
           doAfter: () => 'bar'
         },
@@ -275,48 +218,56 @@ describe('tubes', () => {
           doAfter: jest.fn()
         }
       ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
 
-      await tubes<Phase>('foo', {
-        phases: ['do'],
+      await tubes<Stage>('foo', {
+        stages: ['do'],
         plugins
       })
 
-      expect(plugins[1].doAfter).toHaveBeenCalledWith(
-        'bar',
-        {},
-        expectedContext
-      )
+      expect(mocked(plugins[1].doAfter!).mock.calls[0][0]).toBe('bar')
     })
 
-    test('ignore the result of an end hook', async () => {
-      type Phase = 'do'
-      const plugins: Plugin<Phase>[] = [
+    test('bypass the result of an after hook if it is undefined', async () => {
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
         {
-          doStart: () => 'bar'
+          doAfter: () => undefined
         },
         {
-          doStart: jest.fn()
+          doAfter: jest.fn()
         }
       ]
-      const expectedContext = {
-        errors: [],
-        plugins
-      }
 
-      await tubes<Phase>('foo', {
-        phases: ['do'],
+      await tubes<Stage>('foo', {
+        stages: ['do'],
         plugins
       })
 
-      expect(plugins[1].doStart).toHaveBeenCalledWith(
-        'foo',
-        {},
-        expectedContext
-      )
+      expect(mocked(plugins[1].doAfter!).mock.calls[0][0]).toBe('foo')
+    })
+
+    test('abort the execution on error', async () => {
+      type Stage = 'do'
+      const plugins: Plugin<Stage>[] = [
+        {
+          do: () => {
+            throw new Error()
+          }
+        },
+        {
+          doBefore: jest.fn()
+        }
+      ]
+
+      const { errors } = await tubes<Stage>('foo', {
+        stages: ['do'],
+        plugins
+      })
+
+      expect(errors[0]).toMatchObject({
+        stage: 'do',
+        step: 'do'
+      })
     })
   })
 
@@ -328,7 +279,7 @@ describe('tubes', () => {
       }
 
       await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
@@ -341,7 +292,7 @@ describe('tubes', () => {
       }
 
       const result = await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
@@ -355,7 +306,7 @@ describe('tubes', () => {
       }
 
       const result = await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: [plugin]
       })
 
@@ -364,7 +315,7 @@ describe('tubes', () => {
 
     test('passthrough the input if no producer hook is defined', async () => {
       const result = await tubes('foo', {
-        phases: ['do'],
+        stages: ['do'],
         plugins: []
       })
 
