@@ -1,4 +1,4 @@
-import { Context, HookName, Options, PhaseOption, Result, Task } from './types'
+import { Context, Options, PhaseOption, Result, Step, Task } from './types'
 
 async function pipe<Input, Output>(
   tasks: Task<Input, Output>[],
@@ -12,20 +12,25 @@ async function pipe<Input, Output>(
 
 async function invokeHook<Phase extends string, State, Output, Input>(
   context: Context<Phase>,
-  hookName: HookName<Phase>,
+  step: Step<Phase>,
   input: Input,
   state: State,
-  mutable = false,
   stopOnFirst = false
 ): Promise<Output> {
-  const hooks = context.plugins.map(plugin => plugin[hookName]).filter(Boolean)
+  const hookContext = {
+    ...context,
+    step
+  }
+
+  const hooks = context.plugins.map(plugin => plugin[step]).filter(Boolean)
 
   let output = input
   for (const hook of hooks) {
-    const hookOutput = await hook!(output, state, context)
-    output = mutable ? hookOutput || output : output
+    const hookOutput = await hook!(output, state, hookContext)
+    output = hookOutput || output
     if (stopOnFirst && output) return <Output>(<unknown>output)
   }
+
   return <Output>(<unknown>output)
 }
 
@@ -35,21 +40,17 @@ async function executePhase<Phase extends string, State, Output, Input>(
   input: Input,
   state: State
 ): Promise<Output> {
+  const phaseContext = {
+    ...context,
+    phase
+  }
+
   const tasks: Task<Input, Output>[] = [
     input =>
-      invokeHook(context, <HookName<Phase>>`${phase}Start`, input, state),
+      invokeHook(phaseContext, <Step<Phase>>`${phase}Before`, input, state),
+    input => invokeHook(phaseContext, phase, input, state, true),
     input =>
-      invokeHook(
-        context,
-        <HookName<Phase>>`${phase}Before`,
-        input,
-        state,
-        true
-      ),
-    input => invokeHook(context, phase, input, state, true, true),
-    input =>
-      invokeHook(context, <HookName<Phase>>`${phase}After`, input, state, true),
-    input => invokeHook(context, <HookName<Phase>>`${phase}End`, input, state)
+      invokeHook(phaseContext, <Step<Phase>>`${phase}After`, input, state)
   ]
 
   return await pipe<Input, Output>(tasks, input)
@@ -102,5 +103,6 @@ export async function tubes<
     input,
     initialState
   )
+
   return { errors: context.errors, output }
 }
