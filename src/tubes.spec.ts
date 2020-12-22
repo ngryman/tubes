@@ -91,12 +91,13 @@ describe('tubes', () => {
   })
 
   describe('hook signatures', () => {
-    test('pass the input and context to the before hook', async () => {
+    test('pass the artifact, state, and context to the before hook', async () => {
       const plugin = {
         doBefore: jest.fn()
       }
       const expectedContext = {
         errors: [],
+        input: 'foo',
         stage: 'do',
         step: 'doBefore',
         plugins: [plugin]
@@ -110,12 +111,13 @@ describe('tubes', () => {
       expect(plugin.doBefore).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
 
-    test('pass the input and context to the producer hook', async () => {
+    test('pass the artifact, state, and context to the phase hook', async () => {
       const plugin = {
         do: jest.fn()
       }
       const expectedContext = {
         errors: [],
+        input: 'foo',
         stage: 'do',
         step: 'do',
         plugins: [plugin]
@@ -129,13 +131,14 @@ describe('tubes', () => {
       expect(plugin.do).toHaveBeenCalledWith('foo', {}, expectedContext)
     })
 
-    test('pass the output and context to the after hook', async () => {
+    test('pass the output, state, and context to the after hook', async () => {
       const plugin = {
         do: () => 'bar',
         doAfter: jest.fn()
       }
       const expectedContext = {
         errors: [],
+        input: 'foo',
         stage: 'do',
         step: 'doAfter',
         plugins: [plugin]

@@ -2,10 +2,15 @@ export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 
 export type Hook<
   Stage extends string,
+  InitialInput = any,
   State = any,
   Input = any,
   Output = any | undefined
-> = (input: Input, state: State, context: Context<Stage>) => AsyncOrSync<Output>
+> = (
+  input: Input,
+  state: State,
+  context: Context<Stage, InitialInput>
+) => AsyncOrSync<Output>
 
 export type Task<Input = unknown, Output = unknown> = (
   input: Input
@@ -24,8 +29,9 @@ export type Options<Stage extends string> = {
   plugins: Plugin<Stage>[]
 }
 
-export type Context<Stage extends string> = {
+export type Context<Stage extends string, Input = any> = {
   errors: Error[]
+  input: Input
   stage: Stage | ''
   step: Step<Stage> | ''
   plugins: Plugin<Stage>[]

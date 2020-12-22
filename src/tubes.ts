@@ -11,8 +11,14 @@ async function pipe<Input, Output>(
   }, Promise.resolve(<Output>(<unknown>value)))
 }
 
-async function invokeHook<Stage extends string, State, Output, Input>(
-  context: Context<Stage>,
+async function invokeHook<
+  Stage extends string,
+  InitialInput,
+  State,
+  Output,
+  Input
+>(
+  context: Context<Stage, InitialInput>,
   step: Step<Stage>,
   input: Input,
   state: State,
@@ -39,8 +45,14 @@ async function invokeHook<Stage extends string, State, Output, Input>(
   return <Output>(<unknown>output)
 }
 
-async function executeStage<Stage extends string, State, Output, Input>(
-  context: Context<Stage>,
+async function executeStage<
+  Stage extends string,
+  InitialInput,
+  State,
+  Output,
+  Input
+>(
+  context: Context<Stage, InitialInput>,
   stage: Stage,
   input: Input,
   state: State
@@ -61,8 +73,14 @@ async function executeStage<Stage extends string, State, Output, Input>(
   return await pipe<Input, Output>(tasks, input)
 }
 
-async function executePipeline<Stage extends string, State, Input, Output>(
-  context: Context<Stage>,
+async function executePipeline<
+  Stage extends string,
+  State,
+  InitialInput,
+  Input,
+  Output
+>(
+  context: Context<Stage, InitialInput>,
   stages: StageOption<Stage>[],
   input: Input,
   state: State
@@ -99,14 +117,15 @@ export async function tubes<
   options: Options<Stage>,
   initialState: State = <State>{}
 ): Promise<Result<Output>> {
-  const context: Context<Stage> = {
+  const context: Context<Stage, Input> = {
     errors: [],
+    input,
     stage: '',
     step: '',
     plugins: options.plugins
   }
 
-  const output = await executePipeline<Stage, State, Input, Output>(
+  const output = await executePipeline<Stage, State, Input, Input, Output>(
     context,
     options.stages,
     input,
