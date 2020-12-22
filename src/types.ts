@@ -1,41 +1,34 @@
 export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 
 export type Hook<
-  Phase extends string,
+  Stage extends string,
   State = any,
   Input = any,
-  Output = any
-> = (
-  input: Input,
-  state: State,
-  context: Context<Phase>
-) => AsyncOrSync<Output | undefined>
+  Output = any | undefined
+> = (input: Input, state: State, context: Context<Stage>) => AsyncOrSync<Output>
 
 export type Task<Input = unknown, Output = unknown> = (
   input: Input
 ) => Promise<Output>
 
-export type HookName<T extends string> =
-  | `${T}Start`
-  | `${T}Before`
-  | T
-  | `${T}After`
-  | `${T}End`
+export type Step<T extends string> = T | `${T}Before` | `${T}After`
 
-export type Plugin<Phase extends string> = {
-  [key in HookName<Phase>]?: Hook<Phase>
+export type Plugin<Stage extends string> = {
+  [key in Step<Stage>]?: Hook<Stage>
 }
 
-export type PhaseOption<Phase extends string> = Phase | Phase[]
+export type StageOption<Stage extends string> = Stage | Stage[]
 
-export type Options<Phase extends string> = {
-  phases: PhaseOption<Phase>[]
-  plugins: Plugin<Phase>[]
+export type Options<Stage extends string> = {
+  stages: StageOption<Stage>[]
+  plugins: Plugin<Stage>[]
 }
 
-export type Context<Phase extends string> = {
+export type Context<Stage extends string> = {
   errors: Error[]
-  plugins: Plugin<Phase>[]
+  stage: Stage | ''
+  step: Step<Stage> | ''
+  plugins: Plugin<Stage>[]
 }
 
 export type Result<Output = any> = {
