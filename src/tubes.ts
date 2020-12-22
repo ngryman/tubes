@@ -1,3 +1,4 @@
+import { TubesError } from './error'
 import { Context, Options, PhaseOption, Result, Step, Task } from './types'
 
 async function pipe<Input, Output>(
@@ -26,8 +27,12 @@ async function invokeHook<Phase extends string, State, Output, Input>(
 
   let output = input
   for (const hook of hooks) {
-    const hookOutput = await hook!(output, state, hookContext)
-    output = hookOutput || output
+    try {
+      const hookOutput = await hook!(output, state, hookContext)
+      output = hookOutput || output
+    } catch (err) {
+      context.errors.push(new TubesError(err, hookContext))
+    }
     if (stopOnFirst && output) return <Output>(<unknown>output)
   }
 
