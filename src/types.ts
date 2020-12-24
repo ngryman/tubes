@@ -5,7 +5,7 @@ export type PlainObject = Record<string, any>
 export type CursorContext<Stage extends string> = {
   stage: Stage | ''
   step: Step<Stage> | ''
-  iteration: number
+  index: number
 }
 
 // @internal

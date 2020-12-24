@@ -18,7 +18,7 @@ function createTubesContext<Stage extends string, State, Input>(
   return {
     stage: '',
     step: '',
-    iteration: -1,
+    index: -1,
     errors: [],
     input,
     options,
@@ -73,7 +73,7 @@ async function invokeHook<Stage extends string, State, InitialInput>(
 
     context.stage = stage
     context.step = step
-    context.iteration = i
+    context.index = i
 
     const hookState = Object.freeze({ ...state })
 
@@ -82,7 +82,7 @@ async function invokeHook<Stage extends string, State, InitialInput>(
       input: Object.freeze(input),
       stage,
       step,
-      iteration: i
+      index: i
     })
 
     artifact = (await hook!(artifact, hookState, hookContext, api)) || artifact
