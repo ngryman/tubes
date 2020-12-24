@@ -14,6 +14,6 @@
     "skipLibCheck": true,
     "target": "esnext"
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": ["dist", "src/*.spec.ts", "node_modules"]
 }

@@ -1,5 +1,6 @@
 import 'jest-extended'
 import { mocked } from 'ts-jest/utils'
+import { checkMockArgument, getMockArgument } from '../test/utils'
 import { Context, Plugin } from './types'
 import { tubes } from './tubes'
 
@@ -65,9 +66,9 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].do!).mock.calls[0][0]).toBe(0)
-      expect(mocked(plugins[1].do!).mock.calls[1][0]).toBe(1)
-      expect(mocked(plugins[1].do!).mock.calls[2][0]).toBe(2)
+      checkMockArgument(plugins[1].do, 0, 0, 0)
+      checkMockArgument(plugins[1].do, 1, 0, 1)
+      checkMockArgument(plugins[1].do, 2, 0, 2)
     })
 
     test('convert the input as an array for a sub-stage', async () => {
@@ -86,37 +87,40 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].do!).mock.calls[0][0]).toBe('foo')
+      checkMockArgument(plugins[1].do, 0, 0, 'foo')
     })
   })
 
-  describe('hook API', () => {
+  describe('hook signature', () => {
+    const API_FUNCTIONS = ['addPlugin', 'pushError', 'setState']
+
     test('pass the artifact, state, and context to the before hook', async () => {
       type Stage = 'do'
       const plugin: Plugin<Stage> = {
         doBefore: jest.fn()
       }
-      const expectedContext: Context<Stage> = {
-        errors: [],
-        input: 'foo',
-        options: {
+
+      await tubes(
+        'foo',
+        {
           stages: ['do'],
-          plugins: [plugin],
-          freeze: false
+          plugins: [plugin]
         },
-        cursor: {
-          stage: 'do',
-          step: 'doBefore',
-          iteration: 0
-        }
-      }
+        { foo: 'foo' }
+      )
 
-      await tubes('foo', {
-        stages: ['do'],
-        plugins: [plugin]
+      checkMockArgument(plugin.doBefore, 0, 0, 'foo')
+      checkMockArgument(plugin.doBefore, 0, 1, { foo: 'foo' })
+      checkMockArgument(plugin.doBefore, 0, 2, {
+        stage: 'do',
+        step: 'doBefore',
+        iteration: 0,
+        errors: [],
+        input: 'foo'
       })
-
-      expect(plugin.doBefore).toHaveBeenCalledWith('foo', {}, expectedContext)
+      expect(getMockArgument(plugin.doBefore, 0, 3)).toContainAllKeys(
+        API_FUNCTIONS
+      )
     })
 
     test('pass the artifact, state, and context to the phase hook', async () => {
@@ -124,27 +128,26 @@ describe('tubes', () => {
       const plugin: Plugin<Stage> = {
         do: jest.fn()
       }
-      const expectedContext: Context<Stage> = {
-        errors: [],
-        input: 'foo',
-        options: {
+
+      await tubes(
+        'foo',
+        {
           stages: ['do'],
-          plugins: [plugin],
-          freeze: false
+          plugins: [plugin]
         },
-        cursor: {
-          stage: 'do',
-          step: 'do',
-          iteration: 0
-        }
-      }
+        { foo: 'foo' }
+      )
 
-      await tubes('foo', {
-        stages: ['do'],
-        plugins: [plugin]
+      checkMockArgument(plugin.do, 0, 0, 'foo')
+      checkMockArgument(plugin.do, 0, 1, { foo: 'foo' })
+      checkMockArgument(plugin.do, 0, 2, {
+        stage: 'do',
+        step: 'do',
+        iteration: 0,
+        errors: [],
+        input: 'foo'
       })
-
-      expect(plugin.do).toHaveBeenCalledWith('foo', {}, expectedContext)
+      expect(getMockArgument(plugin.do, 0, 3)).toContainAllKeys(API_FUNCTIONS)
     })
 
     test('pass the output, state, and context to the after hook', async () => {
@@ -153,37 +156,41 @@ describe('tubes', () => {
         do: () => 'bar',
         doAfter: jest.fn()
       }
-      const expectedContext: Context<Stage> = {
-        errors: [],
-        input: 'foo',
-        options: {
+
+      await tubes(
+        'foo',
+        {
           stages: ['do'],
-          plugins: [plugin],
-          freeze: false
+          plugins: [plugin]
         },
-        cursor: {
-          stage: 'do',
-          step: 'doAfter',
-          iteration: 0
-        }
-      }
+        { foo: 'foo' }
+      )
 
-      await tubes('foo', {
-        stages: ['do'],
-        plugins: [plugin]
+      checkMockArgument(plugin.doAfter, 0, 0, 'bar')
+      checkMockArgument(plugin.doAfter, 0, 1, { foo: 'foo' })
+      checkMockArgument(plugin.doAfter, 0, 2, {
+        stage: 'do',
+        step: 'doAfter',
+        iteration: 0,
+        errors: [],
+        input: 'foo'
       })
-
-      expect(plugin.doAfter).toHaveBeenCalledWith('bar', {}, expectedContext)
+      expect(getMockArgument(plugin.doAfter, 0, 3)).toContainAllKeys(
+        API_FUNCTIONS
+      )
     })
+  })
 
-    test('freeze the state if specified', async () => {
+  describe('hook parameters immutability', () => {
+    test('throw an error if mutating the state directly', async () => {
       type Stage = 'do'
       const plugin: Plugin<Stage> = {
-        do: (input, state) => {
+        do(input, state) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
-          state.foo = 'foo'
-        }
+          state.foo = 'bar'
+        },
+        doAfter: jest.fn()
       }
 
       await expect(
@@ -191,8 +198,7 @@ describe('tubes', () => {
           'foo',
           {
             stages: ['do'],
-            plugins: [plugin],
-            freeze: true
+            plugins: [plugin]
           },
           { foo: 'foo' }
         )
@@ -201,14 +207,15 @@ describe('tubes', () => {
       )
     })
 
-    test('freeze the context if specified', async () => {
+    test('throw an error if mutating the context directly', async () => {
       type Stage = 'do'
       const plugin: Plugin<Stage> = {
-        do: (input, state, context) => {
+        do(input, state, context) {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
-          context.input = 'foo'
-        }
+          context.errors.push('foo')
+        },
+        doAfter: jest.fn()
       }
 
       await expect(
@@ -216,13 +223,37 @@ describe('tubes', () => {
           'foo',
           {
             stages: ['do'],
-            plugins: [plugin],
-            freeze: true
+            plugins: [plugin]
           },
           { foo: 'foo' }
         )
       ).rejects.toThrowErrorMatchingInlineSnapshot(
-        `"Cannot assign to read only property 'input' of object '#<Object>'"`
+        `"Cannot add property 0, object is not extensible"`
+      )
+    })
+
+    test('throw an error if mutating the api directly', async () => {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
+        do(input, state, context, api) {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          api.pushError = undefined
+        },
+        doAfter: jest.fn()
+      }
+
+      await expect(
+        tubes(
+          'foo',
+          {
+            stages: ['do'],
+            plugins: [plugin]
+          },
+          { foo: 'foo' }
+        )
+      ).rejects.toThrowErrorMatchingInlineSnapshot(
+        `"Cannot assign to read only property 'pushError' of object '#<Object>'"`
       )
     })
   })
@@ -244,7 +275,7 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].doBefore!).mock.calls[0][0]).toBe('bar')
+      checkMockArgument(plugins[1].doBefore, 0, 0, 'bar')
     })
 
     test('bypass the result of a before hook if it is undefined', async () => {
@@ -263,7 +294,7 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].doBefore!).mock.calls[0][0]).toBe('foo')
+      checkMockArgument(plugins[1].doBefore, 0, 0, 'foo')
     })
 
     test('stop on the first return of a phase hook', async () => {
@@ -301,7 +332,7 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].doAfter!).mock.calls[0][0]).toBe('bar')
+      checkMockArgument(plugins[1].doAfter, 0, 0, 'bar')
     })
 
     test('bypass the result of an after hook if it is undefined', async () => {
@@ -320,40 +351,14 @@ describe('tubes', () => {
         plugins
       })
 
-      expect(mocked(plugins[1].doAfter!).mock.calls[0][0]).toBe('foo')
-    })
-
-    test('abort the execution on error', async () => {
-      type Stage = 'do'
-      const plugins: Plugin<Stage>[] = [
-        {
-          do: () => {
-            throw new Error()
-          }
-        },
-        {
-          doBefore: jest.fn()
-        }
-      ]
-
-      const { errors } = await tubes<Stage>('foo', {
-        stages: ['do'],
-        plugins
-      })
-
-      expect(errors[0]).toMatchObject({
-        cursor: {
-          stage: 'do',
-          step: 'do',
-          iteration: 0
-        }
-      })
+      checkMockArgument(plugins[1].doAfter, 0, 0, 'foo')
     })
   })
 
   describe('transformation', () => {
     test('transform the input with the before hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         doBefore: () => 'bar',
         do: jest.fn()
       }
@@ -363,11 +368,12 @@ describe('tubes', () => {
         plugins: [plugin]
       })
 
-      expect(plugin.do.mock.calls[0][0]).toBe('bar')
+      checkMockArgument(plugin.do, 0, 0, 'bar')
     })
 
     test('transform the input with the phase hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         do: () => 'bar'
       }
 
@@ -380,7 +386,8 @@ describe('tubes', () => {
     })
 
     test('transform the output with the after hook', async () => {
-      const plugin = {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
         do: () => 'bar',
         doAfter: () => 'baz'
       }
@@ -398,8 +405,30 @@ describe('tubes', () => {
         stages: ['do'],
         plugins: []
       })
-
       expect(result.output).toBe('foo')
+    })
+  })
+
+  describe('api', () => {
+    test('setState mutates the state', async () => {
+      type Stage = 'do'
+      const plugin: Plugin<Stage> = {
+        do(input, state, context, { setState }) {
+          setState({ foo: 'bar' })
+        },
+        doAfter: jest.fn()
+      }
+
+      await tubes(
+        'foo',
+        {
+          stages: ['do'],
+          plugins: [plugin]
+        },
+        { foo: 'foo' }
+      )
+
+      checkMockArgument(plugin.doAfter, 0, 1, { foo: 'bar' })
     })
   })
 })

@@ -1,192 +1,159 @@
 import { TubesError } from './error'
 import {
+  Api,
   Context,
-  Cursor,
-  Immutable,
   Options,
-  PlainObject,
+  Plugin,
   Result,
   Step,
-  Task
+  Task,
+  TubesContext
 } from './types'
 
-function maybeFreeze<T extends PlainObject>(
-  object: T,
-  freeze: boolean
-): Immutable<T> {
-  return <Immutable<T>>(freeze ? Object.freeze(object) : object)
+function createTubesContext<Stage extends string, State, Input>(
+  input: Input,
+  options: Options<Stage, State>,
+  state: State
+): TubesContext<Stage, State, Input> {
+  return {
+    stage: '',
+    step: '',
+    iteration: -1,
+    errors: [],
+    input,
+    options,
+    state
+  }
 }
 
-function maybeDeepFreeze<T extends PlainObject>(
-  object: T,
-  freeze: boolean
-): Immutable<T> {
-  if (!freeze) {
-    return <Immutable<T>>object
-  }
-
-  const propNames = Object.getOwnPropertyNames(object)
-  for (const name of propNames) {
-    const value = object[name]
-    if (value && typeof object[name] === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      maybeDeepFreeze(<PlainObject>value, true)
-    }
-  }
-  return maybeFreeze(object, true)
-}
-
-function freezeContext<Phase extends string>(
-  prevContext: Context<Phase>,
-  newContext: Partial<Context<Phase>>
-): Immutable<Context<Phase>> {
-  return <Immutable<Context<Phase>>>maybeFreeze(
-    {
-      ...prevContext,
-      ...maybeDeepFreeze(newContext, prevContext.options.freeze)
+function createApi<Stage extends string, State, Input>(
+  context: TubesContext<Stage, State, Input>
+): Api<Stage, State> {
+  return Object.freeze({
+    addPlugin(plugin: Plugin<Stage, State>) {
+      context.options.plugins.push(plugin)
     },
-    prevContext.options.freeze
-  )
+    setState(state: State) {
+      context.state = {
+        ...context.state,
+        ...state
+      }
+    },
+    pushError(error: Error | Error[]) {
+      const errors = (Array.isArray(error) ? error : [error]).map(
+        err => new TubesError(err, context)
+      )
+
+      context.errors.push(...errors)
+    }
+  })
 }
 
-async function pipe<Input, Output>(
-  tasks: Task<Input, Output>[],
-  value: Input
-): Promise<Output> {
-  return await tasks.reduce<Promise<Output>>(async (prevPromise, task) => {
-    value = <Input>(<unknown>await prevPromise) || value
-    return task(value)
-  }, Promise.resolve(<Output>(<unknown>value)))
+async function invokeTasks(tasks: Task[], artifact: any): Promise<any> {
+  return await tasks.reduce(async (prevPromise, task) => {
+    artifact = (await prevPromise) || artifact
+    return task(artifact)
+  }, Promise.resolve(artifact))
 }
 
-async function invokeHook<
-  Stage extends string,
-  InitialInput,
-  State,
-  Output,
-  Input
->(
-  context: Context<Stage, InitialInput>,
+async function invokeHook<Stage extends string, State, InitialInput>(
   stage: Stage,
   step: Step<Stage>,
-  input: Input,
-  state: State,
+  context: TubesContext<Stage, State, InitialInput>,
+  api: Api<Stage, State>,
+  artifact: any,
   stopOnFirst = false
-): Promise<Output> {
-  const { options } = context
+): Promise<any> {
+  const { errors, input, options, state } = context
 
-  const hookState = maybeDeepFreeze(state, options.freeze)
-
-  let output = input
   const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
 
   for (let i = 0; i < hooks.length; i++) {
     const hook = hooks[i]
 
-    const cursor: Cursor<Stage> = { stage, step, iteration: i }
+    context.stage = stage
+    context.step = step
+    context.iteration = i
 
-    const hookContext = freezeContext(context, { cursor })
+    const hookState = Object.freeze({ ...state })
 
-    try {
-      const hookOutput = await hook!(output, hookState, hookContext)
-      output = hookOutput || output
-    } catch (err) {
-      if (err.name === 'TypeError') throw err
-      context.errors.push(new TubesError(err, hookContext.cursor))
-    }
+    const hookContext: Context<Stage> = Object.freeze({
+      errors: Object.freeze([...errors]),
+      input: Object.freeze(input),
+      stage,
+      step,
+      iteration: i
+    })
 
-    if (stopOnFirst && output) return <Output>(<unknown>output)
+    artifact = (await hook!(artifact, hookState, hookContext, api)) || artifact
+
+    if (stopOnFirst && artifact) return artifact
   }
 
-  return <Output>(<unknown>output)
+  return artifact
 }
 
-async function executeStage<
-  Stage extends string,
-  InitialInput,
-  State,
-  Output,
-  Input
->(
-  context: Context<Stage, InitialInput>,
+async function executeStage<Stage extends string, State, InitialInput>(
   stage: Stage,
-  input: Input,
-  state: State
-): Promise<Output> {
-  const tasks: Task<Input, Output>[] = [
-    input =>
-      invokeHook(context, stage, <Step<Stage>>`${stage}Before`, input, state),
-    input => invokeHook(context, stage, stage, input, state, true),
-    input =>
-      invokeHook(context, stage, <Step<Stage>>`${stage}After`, input, state)
+  context: TubesContext<Stage, State, InitialInput>,
+  api: Api<Stage, State>,
+  artifact: any
+): Promise<any> {
+  const tasks: Task[] = [
+    artifact =>
+      invokeHook(stage, <Step<Stage>>`${stage}Before`, context, api, artifact),
+    artifact => invokeHook(stage, stage, context, api, artifact, true),
+    artifact =>
+      invokeHook(stage, <Step<Stage>>`${stage}After`, context, api, artifact)
   ]
 
-  return await pipe<Input, Output>(tasks, input)
+  return await invokeTasks(tasks, artifact)
 }
 
-async function executePipeline<
-  Stage extends string,
-  State,
-  InitialInput,
-  Input,
-  Output
->(
-  context: Context<Stage, InitialInput>,
+async function executePipeline<Stage extends string, State, InitialInput>(
   stages: (Stage | Stage[])[],
-  input: Input,
-  state: State
-): Promise<Output> {
-  const tasks: Task<Input, Output>[] = stages.map(stage => {
-    const task: Task<Input, Output> = async input => {
+  context: TubesContext<Stage, State, InitialInput>,
+  api: Api<Stage, State>,
+  artifact: any
+): Promise<any> {
+  const tasks: Task[] = stages.map(stage => {
+    const task: Task = async artifact => {
       if (Array.isArray(stage)) {
-        const inputArr = <Input[]>(Array.isArray(input) ? input : [input])
-        const outputArr = await Promise.all(
-          inputArr.map<Promise<Output>>(
-            async input =>
-              await executePipeline({ ...context }, stage, input, { ...state })
+        const artifacts = Array.isArray(artifact) ? artifact : [artifact]
+        const outputs = await Promise.all(
+          artifacts.map(
+            async artifact =>
+              await executePipeline(stage, context, api, artifact)
           )
         )
-        return <Output>(<unknown>outputArr)
+        return outputs
       }
-      return await executeStage(context, stage, input, state)
+      return await executeStage(stage, context, api, artifact)
     }
     return task
   })
 
-  return await pipe<Input, Output>(tasks, input)
+  return await invokeTasks(tasks, artifact)
 }
 
 export async function tubes<
   Stage extends string,
-  State extends PlainObject = PlainObject,
+  State = any,
   Input = any,
   Output = any
 >(
   input: Input,
-  options: Options<Stage>,
-  initialState: State = <State>{}
+  options: Options<Stage, State>,
+  state: State = <State>{}
 ): Promise<Result<Output>> {
-  const validOptions = {
-    freeze: false,
-    ...options
-  }
+  const context = createTubesContext(input, options, state)
+  const api = createApi<Stage, State, Input>(context)
 
-  const context: Context<Stage, Input> = {
-    errors: [],
-    input: maybeDeepFreeze(input, validOptions.freeze),
-    options: maybeDeepFreeze(validOptions, validOptions.freeze),
-    cursor: {
-      stage: '',
-      step: '',
-      iteration: -1
-    }
-  }
-
-  const output = await executePipeline<Stage, State, Input, Input, Output>(
+  const output = await executePipeline<Stage, State, Input>(
+    options.stages,
     context,
-    validOptions.stages,
-    input,
-    initialState
+    api,
+    input
   )
 
   return { errors: context.errors, output }

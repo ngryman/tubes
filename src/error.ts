@@ -1,9 +1,9 @@
-import { Cursor, Immutable } from './types'
+import { CursorContext } from './types'
 
 export class TubesError<Stage extends string> extends Error {
-  public readonly cursor: Immutable<Cursor<Stage>>
+  public readonly cursor: CursorContext<Stage>
 
-  constructor(err: Error, cursor: Immutable<Cursor<Stage>>) {
+  constructor(err: Error, cursor: CursorContext<Stage>) {
     super(err.message)
     this.name = 'TubesError'
     this.stack = err.stack
