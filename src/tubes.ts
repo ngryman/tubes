@@ -43,7 +43,6 @@ function createApi<Stage extends string, State, Input>(
       const errors = (Array.isArray(error) ? error : [error]).map(
         err => new TubesError(err, context)
       )
-
       context.errors.push(...errors)
     }
   })
@@ -69,8 +68,6 @@ async function invokeHook<Stage extends string, State, InitialInput>(
   const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
 
   for (let i = 0; i < hooks.length; i++) {
-    const hook = hooks[i]
-
     context.stage = stage
     context.step = step
     context.index = i
@@ -85,7 +82,8 @@ async function invokeHook<Stage extends string, State, InitialInput>(
       index: i
     })
 
-    artifact = (await hook!(artifact, hookState, hookContext, api)) || artifact
+    artifact =
+      (await hooks[i]!(artifact, hookState, hookContext, api)) || artifact
 
     if (stopOnFirst && artifact) return artifact
   }
@@ -100,14 +98,28 @@ async function executeStage<Stage extends string, State, InitialInput>(
   artifact: any
 ): Promise<any> {
   const tasks: Task[] = [
-    artifact =>
-      invokeHook(stage, <Step<Stage>>`${stage}Before`, context, api, artifact),
-    artifact => invokeHook(stage, stage, context, api, artifact, true),
-    artifact =>
-      invokeHook(stage, <Step<Stage>>`${stage}After`, context, api, artifact)
+    _ => invokeHook(stage, <Step<Stage>>`${stage}Before`, context, api, _),
+    _ => invokeHook(stage, stage, context, api, _, true),
+    _ => invokeHook(stage, <Step<Stage>>`${stage}After`, context, api, _)
   ]
 
   return await invokeTasks(tasks, artifact)
+}
+
+async function executeParallelPipelines<
+  Stage extends string,
+  State,
+  InitialInput
+>(
+  stages: Stage[],
+  context: TubesContext<Stage, State, InitialInput>,
+  api: Api<Stage, State>,
+  artifacts: any[]
+) {
+  const outputs = await Promise.all(
+    artifacts.map(async _ => await executePipeline(stages, context, api, _))
+  )
+  return outputs
 }
 
 async function executePipeline<Stage extends string, State, InitialInput>(
@@ -120,13 +132,7 @@ async function executePipeline<Stage extends string, State, InitialInput>(
     const task: Task = async artifact => {
       if (Array.isArray(stage)) {
         const artifacts = Array.isArray(artifact) ? artifact : [artifact]
-        const outputs = await Promise.all(
-          artifacts.map(
-            async artifact =>
-              await executePipeline(stage, context, api, artifact)
-          )
-        )
-        return outputs
+        return await executeParallelPipelines(stage, context, api, artifacts)
       }
       return await executeStage(stage, context, api, artifact)
     }

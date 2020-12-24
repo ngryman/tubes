@@ -1,7 +1,7 @@
 import 'jest-extended'
 import { mocked } from 'ts-jest/utils'
 import { checkMockArgument, getMockArgument } from '../test/utils'
-import { Context, Plugin } from './types'
+import { Plugin } from './types'
 import { tubes } from './tubes'
 
 describe('tubes', () => {
@@ -114,7 +114,7 @@ describe('tubes', () => {
       checkMockArgument(plugin.doBefore, 0, 2, {
         stage: 'do',
         step: 'doBefore',
-        iteration: 0,
+        index: 0,
         errors: [],
         input: 'foo'
       })
@@ -143,7 +143,7 @@ describe('tubes', () => {
       checkMockArgument(plugin.do, 0, 2, {
         stage: 'do',
         step: 'do',
-        iteration: 0,
+        index: 0,
         errors: [],
         input: 'foo'
       })
@@ -171,7 +171,7 @@ describe('tubes', () => {
       checkMockArgument(plugin.doAfter, 0, 2, {
         stage: 'do',
         step: 'doAfter',
-        iteration: 0,
+        index: 0,
         errors: [],
         input: 'foo'
       })
