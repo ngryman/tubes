@@ -12,10 +12,10 @@ export type CursorContext<Stage extends string> = {
 export type TubesContext<
   Stage extends string,
   State,
-  InitialInput
+  Input
 > = CursorContext<Stage> & {
   errors: Error[]
-  input: InitialInput
+  input: Input
   options: Options<Stage, State>
   state: State
 }
@@ -23,10 +23,10 @@ export type TubesContext<
 // @internal
 export type Task = (input: any) => Promise<any>
 
-export type Context<Stage extends string> = Readonly<
+export type Context<Stage extends string, Input = any> = Readonly<
   CursorContext<Stage> & {
     errors: ReadonlyArray<Error>
-    input: any
+    input: Input
   }
 >
 
@@ -38,25 +38,44 @@ export type Api<Stage extends string, State = any> = Readonly<{
 
 export type Hook<
   Stage extends string,
+  InputArtifact = any,
+  OutputArtifact = InputArtifact,
   State = any,
-  Input = any,
-  Output = any
+  Input = any
 > = (
-  input: Input,
+  artifact: InputArtifact,
   state: State,
-  context: Context<Stage>,
+  context: Context<Stage, Input>,
   api: Readonly<Api<Stage, State>>
-) => AsyncOrSync<Output | undefined>
+) => AsyncOrSync<OutputArtifact | undefined>
 
 export type Step<T extends string> = T | `${T}Before` | `${T}After`
 
-export type Plugin<Stage extends string, State = any> = {
-  [key in Step<Stage>]?: Hook<Stage, State>
+export type Plugin<
+  Stage extends string,
+  InputArtifact = any,
+  OutputArtifact = InputArtifact,
+  State = any,
+  Input = any
+> = {
+  [key in Step<Stage>]?: Hook<
+    Stage,
+    InputArtifact,
+    OutputArtifact,
+    State,
+    Input
+  >
 }
 
-export type Options<Stage extends string, State = any> = {
+export type Options<
+  Stage extends string,
+  InputArtifact = any,
+  OutputArtifact = InputArtifact,
+  State = any,
+  Input = any
+> = {
   stages: (Stage | Stage[])[]
-  plugins: Plugin<Stage, State>[]
+  plugins: Plugin<Stage, InputArtifact, OutputArtifact, State, Input>[]
 }
 
 export type Result<Output = any> = {
