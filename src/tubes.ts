@@ -1,20 +1,11 @@
 import { TubesError } from './error'
-import {
-  Api,
-  Context,
-  Options,
-  Plugin,
-  Result,
-  Step,
-  Task,
-  TubesContext
-} from './types'
+import { Api, Options, Plugin, Result, Step, Task, TubesContext } from './types'
 
-function createTubesContext<Stage extends string, State, Input>(
+function createTubesContext<Stage extends string, Input, State>(
   input: Input,
-  options: Options<Stage, State>,
+  options: Options<Stage, Input, State>,
   state: State
-): TubesContext<Stage, State, Input> {
+): TubesContext<Stage, Input, State> {
   return {
     stage: '',
     step: '',
@@ -26,11 +17,11 @@ function createTubesContext<Stage extends string, State, Input>(
   }
 }
 
-function createApi<Stage extends string, State, Input>(
-  context: TubesContext<Stage, State, Input>
-): Api<Stage, State> {
+function createApi<Stage extends string, Input, State>(
+  context: TubesContext<Stage, Input, State>
+): Api<Stage, Input, State> {
   return Object.freeze({
-    addPlugin(plugin: Plugin<Stage, State>) {
+    addPlugin(plugin: Plugin<Stage, Input, State>) {
       context.options.plugins.push(plugin)
     },
     setState(state: State) {
@@ -48,21 +39,21 @@ function createApi<Stage extends string, State, Input>(
   })
 }
 
-async function invokeTasks(tasks: Task[], artifact: any): Promise<any> {
+async function invokeTasks(tasks: Task[], artifact: unknown): Promise<unknown> {
   return await tasks.reduce(async (prevPromise, task) => {
     artifact = (await prevPromise) || artifact
     return task(artifact)
   }, Promise.resolve(artifact))
 }
 
-async function invokeHook<Stage extends string, State, InitialInput>(
+async function invokeHook<Stage extends string, Input, State>(
   stage: Stage,
   step: Step<Stage>,
-  context: TubesContext<Stage, State, InitialInput>,
-  api: Api<Stage, State>,
-  artifact: any,
+  context: TubesContext<Stage, Input, State>,
+  api: Api<Stage, Input, State>,
+  artifact: unknown,
   stopOnFirst = false
-): Promise<any> {
+): Promise<unknown> {
   const { errors, input, options, state } = context
 
   const hooks = options.plugins.map(plugin => plugin[step]).filter(Boolean)
@@ -74,7 +65,7 @@ async function invokeHook<Stage extends string, State, InitialInput>(
 
     const hookState = Object.freeze({ ...state })
 
-    const hookContext: Context<Stage> = Object.freeze({
+    const hookContext = Object.freeze({
       errors: Object.freeze([...errors]),
       input: Object.freeze(input),
       stage,
@@ -91,12 +82,12 @@ async function invokeHook<Stage extends string, State, InitialInput>(
   return artifact
 }
 
-async function executeStage<Stage extends string, State, InitialInput>(
+async function executeStage<Stage extends string, Input, State>(
   stage: Stage,
-  context: TubesContext<Stage, State, InitialInput>,
-  api: Api<Stage, State>,
-  artifact: any
-): Promise<any> {
+  context: TubesContext<Stage, Input, State>,
+  api: Api<Stage, Input, State>,
+  artifact: unknown
+): Promise<unknown> {
   const tasks: Task[] = [
     _ => invokeHook(stage, <Step<Stage>>`${stage}Before`, context, api, _),
     _ => invokeHook(stage, stage, context, api, _, true),
@@ -106,15 +97,11 @@ async function executeStage<Stage extends string, State, InitialInput>(
   return await invokeTasks(tasks, artifact)
 }
 
-async function executeParallelPipelines<
-  Stage extends string,
-  State,
-  InitialInput
->(
+async function executeParallelPipelines<Stage extends string, Input, State>(
   stages: Stage[],
-  context: TubesContext<Stage, State, InitialInput>,
-  api: Api<Stage, State>,
-  artifacts: any[]
+  context: TubesContext<Stage, Input, State>,
+  api: Api<Stage, Input, State>,
+  artifacts: unknown[]
 ) {
   const outputs = await Promise.all(
     artifacts.map(async _ => await executePipeline(stages, context, api, _))
@@ -122,12 +109,12 @@ async function executeParallelPipelines<
   return outputs
 }
 
-async function executePipeline<Stage extends string, State, InitialInput>(
+async function executePipeline<Stage extends string, Input, State>(
   stages: (Stage | Stage[])[],
-  context: TubesContext<Stage, State, InitialInput>,
-  api: Api<Stage, State>,
-  artifact: any
-): Promise<any> {
+  context: TubesContext<Stage, Input, State>,
+  api: Api<Stage, Input, State>,
+  artifact: unknown
+): Promise<unknown> {
   const tasks: Task[] = stages.map(stage => {
     const task: Task = async artifact => {
       if (Array.isArray(stage)) {
@@ -144,22 +131,24 @@ async function executePipeline<Stage extends string, State, InitialInput>(
 
 export async function tubes<
   Stage extends string,
-  State = any,
-  Input = any,
-  Output = any
+  Input = unknown,
+  Output = unknown,
+  State = unknown
 >(
   input: Input,
-  options: Options<Stage, State>,
+  options: Options<Stage, Input, State>,
   state: State = <State>{}
 ): Promise<Result<Output>> {
   const context = createTubesContext(input, options, state)
-  const api = createApi<Stage, State, Input>(context)
+  const api = createApi(context)
 
-  const output = await executePipeline<Stage, State, Input>(
-    options.stages,
-    context,
-    api,
-    input
+  const output = <Output>(
+    await executePipeline<Stage, Input, State>(
+      options.stages,
+      context,
+      api,
+      input
+    )
   )
 
   return { errors: context.errors, output }

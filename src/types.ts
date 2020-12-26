@@ -1,84 +1,84 @@
+/**
+ * Utils
+ */
+
 export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 
-export type PlainObject = Record<string, any>
+export type PlainObject = Record<string, unknown>
 
-export type CursorContext<Stage extends string> = {
+/**
+ * Shared
+ */
+
+interface CursorContext<Stage extends string> {
   stage: Stage | ''
   step: Step<Stage> | ''
   index: number
 }
 
-// @internal
+/**
+ * Internal
+ */
+
 export type TubesContext<
   Stage extends string,
-  State,
-  Input
+  Input,
+  State
 > = CursorContext<Stage> & {
   errors: Error[]
   input: Input
-  options: Options<Stage, State>
+  options: Options<Stage, Input, State>
   state: State
 }
 
-// @internal
-export type Task = (input: any) => Promise<any>
+export type Task = (input: unknown) => Promise<unknown>
 
-export type Context<Stage extends string, Input = any> = Readonly<
+/**
+ * Public
+ */
+
+export type Context<Stage extends string, Input = unknown> = Readonly<
   CursorContext<Stage> & {
     errors: ReadonlyArray<Error>
     input: Input
   }
 >
 
-export type Api<Stage extends string, State = any> = Readonly<{
-  addPlugin(plugin: Plugin<Stage, State>): void
+export type Api<
+  Stage extends string,
+  Input = unknown,
+  State = unknown
+> = Readonly<{
+  addPlugin(plugin: Plugin<Stage, Input, State>): void
   setState(state: State): void
   pushError(error: Error): void
 }>
 
 export type Hook<
   Stage extends string,
-  InputArtifact = any,
+  InputArtifact = unknown,
   OutputArtifact = InputArtifact,
-  State = any,
-  Input = any
+  State = unknown,
+  Input = unknown
 > = (
   artifact: InputArtifact,
   state: State,
   context: Context<Stage, Input>,
-  api: Readonly<Api<Stage, State>>
+  api: Readonly<Api<Stage, Input, State>>
 ) => AsyncOrSync<OutputArtifact | undefined>
 
 export type Step<T extends string> = T | `${T}Before` | `${T}After`
 
-export type Plugin<
-  Stage extends string,
-  InputArtifact = any,
-  OutputArtifact = InputArtifact,
-  State = any,
-  Input = any
-> = {
-  [key in Step<Stage>]?: Hook<
-    Stage,
-    InputArtifact,
-    OutputArtifact,
-    State,
-    Input
-  >
+export type Plugin<Stage extends string, Input = unknown, State = unknown> = {
+  [key in Step<Stage>]?: Hook<Stage, unknown, unknown, State, Input>
 }
 
-export type Options<
-  Stage extends string,
-  InputArtifact = any,
-  OutputArtifact = InputArtifact,
-  State = any,
-  Input = any
-> = {
+export type Options<Stage extends string, Input = unknown, State = unknown> = {
   stages: (Stage | Stage[])[]
-  plugins: Plugin<Stage, InputArtifact, OutputArtifact, State, Input>[]
+  plugins: Plugin<Stage, Input, State>[]
 }
 
-export type Result<Output = any> = {
+export type Result<Output = unknown> = {
   errors: Error[]
   output: Output
 }
