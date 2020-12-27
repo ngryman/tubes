@@ -1,10 +1,20 @@
 {
   "name": "@ngryman/tubes",
   "version": "0.0.0",
-  "description": "Tasks executor with a plugin system.",
+  "description": "Customizable pipeline executor.",
+  "author": "Nicolas Gryman <ngryman@gmail.com> (https://ngryman.sh)",
+  "license": "MIT",
+  "repository": "ngryman/tubes",
   "main": "dist/tubes.js",
   "module": "dist/tubes.es.js",
   "types": "dist/index.d.ts",
+  "keywords": [
+    "pipe",
+    "pipeline",
+    "executor",
+    "runner",
+    "plugin"
+  ],
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
@@ -12,8 +22,11 @@
     "lint": "eslint src/**/*.ts",
     "test": "jest"
   },
-  "author": "",
-  "license": "MIT",
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/jest": "^26.0.17",
