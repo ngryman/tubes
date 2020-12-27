@@ -1,0 +1,5 @@
+{
+  "extends": ".",
+  "compilerOptions": {},
+  "exclude": ["test", "src/*.spec.ts"]
+}
