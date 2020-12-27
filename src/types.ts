@@ -7,18 +7,14 @@ export type AsyncOrSync<Value> = PromiseLike<Value> | Value
 export type PlainObject = Record<string, unknown>
 
 /**
- * Shared
+ * Internal
  */
 
-interface CursorContext<Stage extends string> {
+export interface CursorContext<Stage extends string> {
   stage: Stage | ''
   step: Step<Stage> | ''
   index: number
 }
-
-/**
- * Internal
- */
 
 export type TubesContext<
   Stage extends string,
