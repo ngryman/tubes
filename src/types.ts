@@ -66,7 +66,7 @@ export type Hook<
 export type Step<T extends string> = T | `${T}Before` | `${T}After`
 
 export type Plugin<Stage extends string, Input = unknown, State = unknown> = {
-  [key in Step<Stage>]?: Hook<Stage, unknown, unknown, State, Input>
+  [key in Step<Stage>]?: Hook<Stage, any, any, State, Input>
 }
 
 export type Options<Stage extends string, Input = unknown, State = unknown> = {
